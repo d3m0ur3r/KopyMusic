@@ -49,6 +49,11 @@ def arg_parser() -> argparse.Namespace:
                         metavar='Username',
                         help='Username is required, if remote path is over the network.')
 
+    parser.add_argument('-p', '--password',
+                        action='store',
+                        metavar='Password',
+                        help='sftp password (ssh)')
+
     parser.add_argument('-k', '--key',
                         action='store',
                         metavar='Private key',
@@ -58,9 +63,18 @@ def arg_parser() -> argparse.Namespace:
                         action='store_true',
                         help='Reverses the copy direction from "remote >> local" to "local >> remote"')
 
-    parser.add_argument('-t',
+    parser.add_argument('-m', '--mirror',
+                        action='store_true',
+                        help='Mirrors path')
+
+    parser.add_argument('-t', '--transfer',
                         action='store_true',
                         help='Signals the program to copy the Music')
+
+    parser.add_argument('--file-type',
+                        action='store',
+                        metavar='File type',
+                        help='Specify file type extension e.g. .mp3,mp4 etc.')
 
     parser.add_argument('--debug',
                         action='store_true',
