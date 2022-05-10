@@ -14,7 +14,7 @@ class KopyMusic:
         self.local_path: str = self.args.local
         self.username: str = self.args.username
         self.password: str = self.args.password
-        self.file_type: str = self.args.file_type
+        self.extension: str = self.args.ext
         self.reverse: bool = self.args.reverse
         self.mirror: bool = self.args.mirror
         self.transfer_files: bool = self.args.transfer
@@ -48,6 +48,7 @@ class KopyMusic:
                          f"Reverse:        {self.reverse}",
                          f"Mirror:         {self.mirror}",
                          f"Transfer Files: {self.transfer_files}"]
+
         max_length = max([len(x) for x in debugger_list])
         padding = 4
         spacer = " " * padding
@@ -59,13 +60,23 @@ class KopyMusic:
         debug_top_bar = f"{'╠' + ('═' * padding_calculation) + '╣'}"
         debug_bottom = f"╚{'═' * padding_calculation}╝"
 
+        for index, d in enumerate(debugger_list):
+            d = list(d)
+            if index % 2 == 0:
+                num = 33
+            else:
+                num = 30
+            for i, x in enumerate(d):
+                if x not in ['║', ' ']:
+                    d[i] = f"\x1b[1;{num}m{x}\x1b[0m"
+            debugger_list[index] = "".join(d)
+
         debugger_list.insert(0, debug_top)
         debugger_list.insert(1, debug_top_msg)
         debugger_list.insert(2, debug_top_bar)
         debugger_list.append(debug_bottom)
 
         _ = *map(print, debugger_list),
-
 
     @staticmethod
     def co(text, color: str) -> str:
@@ -109,7 +120,7 @@ class KopyMusic:
 
     def list_local_folder(self, local_path: str) -> list:
         """Lists a local folder using powershell"""
-        file_types = f"*.{self.file_type}" if self.file_type else ""
+        file_types = f"*.{self.extension}" if self.extension else ""
         windows_cmdline = f"powershell -c \"(ls {local_path} {file_types}).Name\""
         command = subprocess.Popen(windows_cmdline, shell=True, text=True,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -147,32 +158,45 @@ class KopyMusic:
             self.path = fr".\{path}"
             self.operating_system = "Windows"
 
+    def file_extension(self, files: list) -> list:
+        """Checks file extension"""
+        return [x for x in files if x.split('.')[-1] == self.extension]
+
     def filetransfer(self, private_key: str = "~/.ssh/id_rsa") -> None:
         """Uses sftp to check remote folder and compare it to a local folder.
         The difference between those folders are copied to the local folder
-        If no username is present, a local to local copy direction is used instead"""
+        If no username is present, a local to local copy direction is used instead.
+        NEEDS AN OVERHAUL!"""
 
         source_path: str = ""
         target_path: str = ""
 
-        if not self.username:
+        if not self.username:  # Local to local transfer
+            # print(self.username) # Debug
             self.local_to_local()
 
             self.remote_files: list = self.list_local_folder(self.remote_path)
             self.local_files: list = self.list_local_folder(self.local_path)
 
+            if self.extension:  # --ext
+                self.remote_files: list = self.file_extension(self.remote_files)
+                self.local_files: list = self.file_extension(self.local_files)
+
             if not self.reverse:
-                self.username = os.environ['USERNAME']
-                self.host = os.environ['COMPUTERNAME']
+                username = os.environ['USERNAME']
+                host = os.environ['COMPUTERNAME']
+                self.path = self.remote_path
                 difference = set(self.remote_files).difference(set(self.local_files))  # Checks difference
                 self.echo_transport_direction(self.local_path, self.remote_path)
             else:
-                self.username = os.environ['USERNAME']
-                self.host = os.environ['COMPUTERNAME']
+                username = os.environ['USERNAME']
+                host = os.environ['COMPUTERNAME']
+                self.path = self.local_path
                 difference = set(self.local_files).difference(set(self.remote_files))  # Checks difference
                 self.echo_transport_direction(self.local_path, self.remote_path, self.reverse)
 
             if difference:
+
                 for d in difference:
 
                     if self.operating_system == "Windows":
@@ -187,9 +211,9 @@ class KopyMusic:
 
                     output_format = "[{0}]━━[USER:{1}]━[HOST:{2}]━[FOLDER:{3}]━[TRACK:{4}]".format(
                         self.co('+', 'green'),
-                        self.co(self.username,
+                        self.co(username,
                                 'green'),
-                        self.co(self.host, 'green'),
+                        self.co(host, 'green'),
                         self.co(self.path, 'green'),
                         self.co(d, 'green'))
                     print(output_format)
@@ -200,26 +224,30 @@ class KopyMusic:
 
                         with open(target_path, 'wb') as wf:
                             wf.write(file)
+            else:
+                print("\x1b[1;31m[-]\x1b[0m Nothing to copy.")
+
         else:
             self.remote_to_local()
 
             with pysftp.Connection(host=self.host, username=self.username, password=self.password,
                                    private_key=private_key) as sftp:
-                self.remote_files: list = sorted(sftp.listdir(self.path))  # Music folder on my raspberry pi
-                self.local_files: list = sorted(self.list_local_folder(self.local_path))
+                self.remote_files: list = sftp.listdir(self.path)  # Music folder on my raspberry pi
+                self.local_files: list = self.list_local_folder(self.local_path)
 
-                if self.file_type:
-                    self.remote_files = [x for x in self.remote_files if x.split('.')[-1] == self.file_type]
-                    self.local_files = [x for x in self.local_files if x.split('.')[-1] == self.file_type]
+                if self.extension:
+                    self.remote_files: list = self.file_extension(self.remote_files)
+                    self.local_files: list = self.file_extension(self.local_files)
 
                 if not self.reverse:
+                    username = self.username
+                    host = self.host
                     loader = sftp.get
                     difference = set(self.remote_files).difference(set(self.local_files))  # Checks difference
                     self.echo_transport_direction(self.local_path, self.remote_path)
                 else:
-                    self.username = os.environ['USERNAME']
-                    self.host = os.environ['COMPUTERNAME']
-                    path = self.local_path
+                    username = os.environ['USERNAME']
+                    host = os.environ['COMPUTERNAME']
                     loader = sftp.put
                     difference = set(self.local_files).difference(set(self.remote_files))  # Checks difference
                     self.echo_transport_direction(self.local_path, self.remote_path, self.reverse)
@@ -234,9 +262,9 @@ class KopyMusic:
 
                         output_format = "[{0}]━━[USER:{1}]━[HOST:{2}]━[FOLDER:{3}]━[TRACK:{4}]".format(
                             self.co('+', 'green'),
-                            self.co(self.username,
+                            self.co(username,
                                     'green'),
-                            self.co(self.host, 'green'),
+                            self.co(host, 'green'),
                             self.co(self.path, 'green'),
                             self.co(d, 'green'))
                         print(output_format)

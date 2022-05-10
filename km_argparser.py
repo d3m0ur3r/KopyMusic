@@ -47,7 +47,7 @@ def arg_parser() -> argparse.Namespace:
     parser.add_argument('-u', '--username',
                         action='store',
                         metavar='Username',
-                        help='Username is required, if remote path is over the network.')
+                        help='Username is only for network transfers.')
 
     parser.add_argument('-p', '--password',
                         action='store',
@@ -71,7 +71,7 @@ def arg_parser() -> argparse.Namespace:
                         action='store_true',
                         help='Signals the program to copy the Music')
 
-    parser.add_argument('--file-type',
+    parser.add_argument('--ext',
                         action='store',
                         metavar='File type',
                         help='Specify file type extension e.g. .mp3,mp4 etc.')
@@ -84,7 +84,7 @@ def arg_parser() -> argparse.Namespace:
                         version=f'{banner}'
                                 f'\nKopy '
                                 f'\nMusic '
-                                f'\nv0.1 by \x1b[1;32md3m0ur3r\x1b[0m ',
+                                f'\nv0.2 by \x1b[1;3;32md3m0ur3r\x1b[0m ',
                         help=f'Prints the version of {prog_name}')
 
     args = parser.parse_args()  # Engages ArgParser
