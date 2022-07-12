@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """Copies new music files on to my main pc."""
 from KopyMusic import KopyMusic
 

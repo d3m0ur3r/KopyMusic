@@ -169,13 +169,13 @@ class KopyMusic:
             """Linux System parsing of folder path"""
             self.host, path = self.remote_path.split("/", maxsplit=1)
             self.path = f"./{path}"
-            self.operating_system = "Linux"
+            # self.operating_system = "Linux"
 
         elif '\\' in self.remote_path:
             """Windows System parsing of folder path"""
             self.host, path = self.remote_path.split("\\", maxsplit=1)
             self.path = fr".\{path}"
-            self.operating_system = "Windows"
+            # self.operating_system = "Windows"
 
     def file_extension(self, files: list) -> list:
         """Checks file extension"""
@@ -189,12 +189,11 @@ class KopyMusic:
 
         source_path: str = ""
         target_path: str = ""
+        username, host = self.determine_os()
 
         if not self.username:  # Local to local transfer
             # print(self.username) # Debug
-            self.local_to_local()
-
-            username, host = self.determine_os()
+            self.local_to_local()  # Checks if paths are valid
 
             self.remote_files: list = self.list_local_folder(self.remote_path)
             self.local_files: list = self.list_local_folder(self.local_path)
@@ -245,10 +244,11 @@ class KopyMusic:
                 print("\x1b[1;31m[-]\x1b[0m Nothing to copy.")
 
         else:
-            self.remote_to_local()
+            self.remote_to_local()  # Checks if paths are valid and remote host is up
 
             with pysftp.Connection(host=self.host, username=self.username, password=self.password,
                                    private_key=private_key, port=self.port) as sftp:
+
                 self.remote_files: list = sftp.listdir(self.path)  # Music folder on my raspberry pi
                 self.local_files: list = self.list_local_folder(self.local_path)
 
@@ -263,7 +263,7 @@ class KopyMusic:
                     difference = set(self.remote_files).difference(set(self.local_files))  # Checks difference
                     self.echo_transport_direction(self.local_path, self.remote_path)
                 else:
-                    username, host = self.determine_os()
+
                     loader = sftp.put
                     difference = set(self.local_files).difference(set(self.remote_files))  # Checks difference
                     self.echo_transport_direction(self.local_path, self.remote_path, self.reverse)

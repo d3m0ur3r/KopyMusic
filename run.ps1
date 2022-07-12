@@ -1,1 +1,0 @@
-python3.10 .\main.py -u pi -r 192.168.1.224/Music/ -l D:\Music -t; Write-Host "Closing in 5 secs."; Start-Sleep 5
