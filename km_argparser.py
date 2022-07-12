@@ -1,7 +1,7 @@
 import sys
 import argparse
 
-banner = """\x1b[1;32m
+banner = r"""
  _   __                     ___  ___             _       
 | | / /                     |  \/  |            (_)      
 | |/ /   ___   _ __   _   _ | .  . | _   _  ___  _   ___ 
@@ -10,7 +10,9 @@ banner = """\x1b[1;32m
 \_| \_/ \___/ | .__/  \__, |\_|  |_/ \__,_||___/|_| \___|
               | |      __/ |                             
               |_|     |___/                              
-\x1b[0m"""
+"""
+
+banner = f"\x1b[1;32m{banner}\x1b[0m"  # Adds color
 
 
 def arg_parser() -> argparse.Namespace:
@@ -32,14 +34,14 @@ def arg_parser() -> argparse.Namespace:
 
     parser.add_argument('-r', '--remote',
                         action='store',
-                        metavar='\tRemote',
+                        metavar='Remote',
                         type=str,
                         required=True,
                         help=r'Remote path e.g. Hostname\Users\MyUser\Music')
 
     parser.add_argument('-l', '--local',
                         action='store',
-                        metavar='\tLocal',
+                        metavar='Local',
                         type=str,
                         required=True,
                         help=r'Local folder e.g. C:\Users\MyUser\Music.')
@@ -74,7 +76,15 @@ def arg_parser() -> argparse.Namespace:
     parser.add_argument('--ext',
                         action='store',
                         metavar='File type',
-                        help='Specify file type extension e.g. .mp3,mp4 etc.')
+                        nargs="+",
+                        help='Specify file type extension e.g. .mp3 mp4 etc.')
+
+    parser.add_argument('-P', '--port',
+                        action='store',
+                        metavar='Port',
+                        type=int,
+                        default=22,
+                        help='Specify port number. Defaults to 22')
 
     parser.add_argument('--debug',
                         action='store_true',
