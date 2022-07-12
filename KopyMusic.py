@@ -161,7 +161,7 @@ class KopyMusic:
 
     def remote_host_check(self, host: str, username: str) -> str:
         response_code, response_txt = subprocess.getstatusoutput(f'ssh -p {self.port} -l {username} {host} "whoami"')
-        return response_txt  # Username
+        return response_txt
 
     def path_handler(self):
         """Replaces slashes based on OS"""
