@@ -1,8 +1,7 @@
 import platform
 import os
-import subprocess
-import pysftp
 from km_argparser import arg_parser
+import re
 
 
 class KopyMusic:
@@ -54,7 +53,7 @@ class KopyMusic:
 
         return username, host
 
-    def debugger(self):
+    def debugger(self) -> None:
         """Debugger menu"""
         debugger_list = [f"Remote Path:    {self.remote_path}",
                          f"Local Path:     {self.local_path}",
@@ -99,7 +98,7 @@ class KopyMusic:
         if color == 'red':
             color = 31
         elif color == 'green':
-            color = 32
+            color = '38;2;102;255;102'  # Colors foreground
         elif color == 'yellow':
             color = 33
         elif color == 'blue':
@@ -107,25 +106,32 @@ class KopyMusic:
 
         return f"\x1b[1;{color}m{text}\x1b[0m"
 
-    def local_to_local(self):
+    def local_to_local(self) -> None:
         """local path filetransfer"""
+
+        if self.remote_path == self.local_path:
+            print("Paths can't be identical.")
+            raise SystemExit(0)
+
         if not self.validate_path(self.local_path):
             print("Local path not valid.")
             raise SystemExit(0)
 
         if not self.validate_path(self.remote_path):
-            print("Remote path not valid.")
+            pattern = re.compile('((\d){1,3}\.){3}(\d){1,3}')  # Detects ip
+            try:
+                string_check = re.search(pattern=pattern, string=self.remote_path).group()
+                if string_check:
+                    print("Missing username e.g. -u <USERNAME>")
+            except AttributeError:
+                print("Remote path not valid")
+
             raise SystemExit(0)
 
-    def remote_to_local(self):
+    def remote_to_local(self) -> None:
         """Uses sftp to connect to remote path"""
         if not self.validate_path(self.local_path):
             print("Local path not valid.")
-            raise SystemExit(0)
-
-        if self.remote_host_check(self.host,
-                                  self.username) != self.username:  # Validates remote path via ssh connection
-            print("Host not up. Exiting.")
             raise SystemExit(0)
 
     @staticmethod
@@ -133,19 +139,11 @@ class KopyMusic:
         """Validate path"""
         return os.path.exists(path)
 
-    def list_local_folder(self, local_path: str) -> list:
+    def list_local_folder(self, path: str) -> list:
         """Lists a local folder using powershell"""
         self.operating_system = platform.system()
 
-        if self.operating_system == 'Windows':
-            cmdline = f"powershell -c \"(Get-ChildItem {local_path}).Name\""
-        else:  # Unix
-            cmdline = f"ls {local_path}"
-
-        command = subprocess.Popen(cmdline, shell=True, text=True,
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        output, error = command.communicate()
-        list_output: list = [x for x in output.split("\n") if x]
+        list_output: list = os.listdir(path)
         return list_output
 
     def echo_transport_direction(self, remote: str, local: str, reverse: bool = False) -> None:
@@ -158,10 +156,6 @@ class KopyMusic:
             f"{self.color('╚[', 'red')}{self.color(local, 'green')}{self.color(']', 'red')}"
             f"{self.color('═[>>>]═', 'red')}"
             f"{self.color('[', 'red')}{self.color(remote, 'blue')}{self.color(']', 'red')}")
-
-    def remote_host_check(self, host: str, username: str) -> str:
-        response_code, response_txt = subprocess.getstatusoutput(f'ssh -p {self.port} -l {username} {host} "whoami"')
-        return response_txt
 
     def path_handler(self):
         """Replaces slashes based on OS"""
@@ -181,14 +175,34 @@ class KopyMusic:
         """Checks file extension"""
         return [x for x in files if x.split('.')[-1] in self.extension]
 
+    def source_dest_handler(self, difference, mode='local') -> tuple[list, list] or list:
+        """Handles transfer paths. Returns two list with source and destination paths.
+        If mode is set to 'remote', then only destination path are returned.
+        """
+
+        source_path: list = []
+        dest_path: list = []
+        if self.operating_system == "Windows":
+            source_path = [os.path.join(self.remote_path, d) for d in difference]  # From path
+            dest_path = [os.path.join(self.local_path, d) for d in difference]  # To path
+            # copy_mode = "robocopy" # Possible future upgrade
+        elif self.operating_system == "Linux":
+            source_path = [os.path.join(self.remote_path, d).replace("\\", "/") for d in difference]  # From path
+            dest_path = [os.path.join(self.local_path, d).replace("\\", "/") for d in difference]  # To path
+            # copy_mode = ""
+
+        if mode == 'local':
+            return source_path, dest_path
+        elif mode == 'remote':
+            del source_path
+            return dest_path
+
     def filetransfer(self, private_key: str = "~/.ssh/id_rsa") -> None:
         """Uses sftp to check remote folder and compare it to a local folder.
         The difference between those folders are copied to the local folder
         If no username is present, a local to local copy direction is used instead.
         """
 
-        source_path: str = ""
-        target_path: str = ""
         username, host = self.determine_os()
 
         if not self.username:  # Local to local transfer
@@ -213,32 +227,32 @@ class KopyMusic:
 
             if difference:
 
-                for d in difference:
+                source_path, dest_path = self.source_dest_handler(difference)
+                source_path: list = source_path
+                dest_path: list = dest_path
 
-                    if self.operating_system == "Windows":
-                        source_path = os.path.join(self.remote_path, d)
-                        target_path = os.path.join(self.local_path, d)
-                    elif self.operating_system == "Linux":
-                        source_path = os.path.join(self.remote_path, d).replace("\\", "/")
-                        target_path = os.path.join(self.local_path, d).replace("\\", "/")
+                for source, dest, diff in zip(source_path, dest_path, difference):
 
                     if self.reverse:
-                        source_path, target_path = target_path, source_path
+                        source, dest = dest, source
 
-                    output_format = "[{0}]━━[USER:{1}]━[HOST:{2}]━[FOLDER:{3}]━[TRACK:{4}]".format(
-                        self.color('+', 'green'),
-                        self.color(username,
-                                   'green'),
-                        self.color(host, 'green'),
+                    output_format = "[FOLDER:{0}]━[TRACK:{1}]".format(
                         self.color(self.path, 'green'),
-                        self.color(d, 'green'))
+                        self.color(diff, 'green'))
                     print(output_format)
 
+                    # Use windows robocopy
+                    # if copy_mode:
+                    #     command = subprocess.Popen("Robocopy ", shell=True, text=True,
+                    #                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    #     output, error = command.communicate()
+                    #     list_output: list = [x for x in output.split("\n") if x]
+
                     if self.transfer_files:
-                        with open(source_path, 'rb') as rf:
+                        with open(source, 'rb') as rf:
                             file = rf.read()
 
-                        with open(target_path, 'wb') as wf:
+                        with open(dest, 'wb') as wf:
                             wf.write(file)
             else:
                 print("\x1b[1;31m[-]\x1b[0m Nothing to copy.")
@@ -246,6 +260,7 @@ class KopyMusic:
         else:
             self.remote_to_local()  # Checks if paths are valid and remote host is up
 
+            import pysftp
             with pysftp.Connection(host=self.host, username=self.username, password=self.password,
                                    private_key=private_key, port=self.port) as sftp:
 
@@ -269,12 +284,10 @@ class KopyMusic:
                     self.echo_transport_direction(self.local_path, self.remote_path, self.reverse)
 
                 if difference:
-                    for d in difference:
 
-                        if self.operating_system == "Windows":
-                            target_path = os.path.join(self.local_path, d)
-                        elif self.operating_system == "Linux":
-                            target_path = os.path.join(self.local_path, d).replace("\\", "/")
+                    dest_path: list = self.source_dest_handler(difference, mode='remote')
+
+                    for dest, diff in zip(dest_path, difference):
 
                         output_format = "[{0}]━━[USER:{1}]━[HOST:{2}]━[FOLDER:{3}]━[TRACK:{4}]".format(
                             self.color('+', 'green'),
@@ -282,11 +295,11 @@ class KopyMusic:
                                        'green'),
                             self.color(host, 'green'),
                             self.color(self.path, 'green'),
-                            self.color(d, 'green'))
+                            self.color(diff, 'green'))
                         print(output_format)
 
                         if self.transfer_files:
-                            loader(remotepath=f"{self.path}/{d}", localpath=target_path)  # Does the heavy lifting
+                            loader(remotepath=f"{self.path}/{diff}", localpath=dest)  # Does the heavy lifting
 
                 else:
                     print("\x1b[1;31m[-]\x1b[0m Nothing to copy.")
