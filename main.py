@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Copies new music files on to my main pc."""
+"""Copies music files"""
 from KopyMusic import KopyMusic
 
 

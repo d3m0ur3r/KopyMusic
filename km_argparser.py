@@ -22,13 +22,13 @@ def arg_parser() -> argparse.Namespace:
                                      epilog=r"""
  *   KopyMusic does 'no-clobber' by default.
  **  KopyMusic uses sftp to connect to remote path.
-╔══════════════════════════════════════[ Examples ]═════════════════════════════════════╗                                         
-║  -u jack -r 192.168.1.110/Music -l C:\Users\Jack\Music -t    #Linux to Windows        ║
-║  -u jack -r 192.168.1.110/Music -l ~/Music/ -t               #Linux to Linux          ║
+╔══════════════════════════════════════[ Examples ]═════════════════════════════════════╗
+║  -u jack -r 192.168.1.110/Music -l $HOME/Music -t                                     ║
+║  -u jack -r 192.168.1.110/Music -l ~/Music/ -t                                        ║
 ║  -u jack -r 192.168.1.110/Music -l ~/Music/ --reverse -t #Reverses the copy direction ║
 ╚═══════════════════════════════════════════════════════════════════════════════════════╝
 """,
-                                     usage=f"{prog_name} [options] -u [user] -r [remote path] -l [local path]",
+                                     usage=f"KopyMusic [options] -r [remote path] -l [local path]",
                                      prefix_chars="-",
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
 
@@ -61,23 +61,24 @@ def arg_parser() -> argparse.Namespace:
                         metavar='Private key',
                         help='Specify key path, common path: "~/.ssh/id_rsa"')
 
-    parser.add_argument('--reverse',
+    parser.add_argument('-R', '--reverse',
                         action='store_true',
                         help='Reverses the copy direction from "remote >> local" to "local >> remote"')
 
     parser.add_argument('-m', '--mirror',
                         action='store_true',
-                        help='Mirrors path')
+                        help='Mirror paths')
 
     parser.add_argument('-t', '--transfer',
                         action='store_true',
-                        help='Signals the program to copy the Music')
+                        help='Signals the program to copy the files')
 
     parser.add_argument('--ext',
                         action='store',
                         metavar='File type',
                         nargs="+",
-                        help='Specify file type extension e.g. .mp3 mp4 etc.')
+                        default='mp3 mp4',
+                        help='Specify file type. Default is mp3 mp4')
 
     parser.add_argument('-P', '--port',
                         action='store',
@@ -85,6 +86,20 @@ def arg_parser() -> argparse.Namespace:
                         type=int,
                         default=22,
                         help='Specify port number. Defaults to 22')
+
+    parser.add_argument('-c', '--clobber',
+                        action='store_true',
+                        help='Overwrites any existing files')
+
+    parser.add_argument('-s', '--search',
+                        action='store',
+                        metavar='Search',
+                        nargs='+',
+                        help='Search for a filename(s)')
+
+    parser.add_argument('-S', '--shell',
+                        action='store_true',
+                        help='Creates a pseudo-shell for ease of use')
 
     parser.add_argument('--debug',
                         action='store_true',
@@ -94,7 +109,7 @@ def arg_parser() -> argparse.Namespace:
                         version=f'{banner}'
                                 f'\nKopy '
                                 f'\nMusic '
-                                f'\nv0.2 by \x1b[1;3;32md3m0ur3r\x1b[0m ',
+                                f'\nv0.3 by \x1b[1;3;32md3m0ur3r\x1b[0m ',
                         help=f'Prints the version of {prog_name}')
 
     args = parser.parse_args()  # Engages ArgParser

@@ -2,6 +2,8 @@ import platform
 import os
 from km_argparser import arg_parser
 import re
+from rich.table import Table
+from rich.live import Live
 
 
 class KopyMusic:
@@ -15,9 +17,11 @@ class KopyMusic:
         self.username: str = self.args.username
         self.password: str = self.args.password
         self.extension: list = self.args.ext
+        self.search: str = self.args.search
         self.reverse: bool = self.args.reverse  # Switch
         self.mirror: bool = self.args.mirror  # Switch
         self.transfer_files: bool = self.args.transfer  # Switch
+        self.clobber: bool = self.args.clobber  # Switch
         self.debug: bool = self.args.debug  # Switch
         self.port: int = self.args.port
         self.host: str = "Host"
@@ -63,6 +67,8 @@ class KopyMusic:
                          f"Mirror:         {self.mirror}",
                          f"Extension:      {self.extension}",
                          f"Port:           {self.port}",
+                         f"Search:         {self.search}",
+                         f"Clobber:        {self.clobber}",
                          f"Transfer Files: {self.transfer_files}"]
 
         max_length = max([len(x) for x in debugger_list])
@@ -90,22 +96,6 @@ class KopyMusic:
 
         _ = *map(print, debugger_list),
 
-    @staticmethod
-    def color(text, color: str) -> str:
-        """Colors the text"""
-
-        color = color.lower()
-        if color == 'red':
-            color = 31
-        elif color == 'green':
-            color = '38;2;102;255;102'  # Colors foreground
-        elif color == 'yellow':
-            color = 33
-        elif color == 'blue':
-            color = 34
-
-        return f"\x1b[1;{color}m{text}\x1b[0m"
-
     def local_to_local(self) -> None:
         """local path filetransfer"""
 
@@ -118,7 +108,7 @@ class KopyMusic:
             raise SystemExit(0)
 
         if not self.validate_path(self.remote_path):
-            pattern = re.compile('((\d){1,3}\.){3}(\d){1,3}')  # Detects ip
+            pattern = re.compile(r'((\d){1,3}\.){3}(\d){1,3}')  # Detects ip
             try:
                 string_check = re.search(pattern=pattern, string=self.remote_path).group()
                 if string_check:
@@ -146,17 +136,6 @@ class KopyMusic:
         list_output: list = os.listdir(path)
         return list_output
 
-    def echo_transport_direction(self, remote: str, local: str, reverse: bool = False) -> None:
-        """Prints a transport direction"""
-        if reverse:
-            local, remote = remote, local
-
-        print(
-            f"{self.color('╔[', 'red')}Transport direction{self.color(']', 'red')}\n"
-            f"{self.color('╚[', 'red')}{self.color(local, 'green')}{self.color(']', 'red')}"
-            f"{self.color('═[>>>]═', 'red')}"
-            f"{self.color('[', 'red')}{self.color(remote, 'blue')}{self.color(']', 'red')}")
-
     def path_handler(self):
         """Replaces slashes based on OS"""
         if '/' in self.remote_path:
@@ -171,24 +150,39 @@ class KopyMusic:
             self.path = fr".\{path}"
             # self.operating_system = "Windows"
 
+    def search_files(self, files: list) -> list:
+        """Searches for input given and returns a list"""
+
+        search_list: list = []
+        for x in files:
+            for y in self.search:
+                if y.lower() in x.lower():
+                    search_list.append(x)
+
+        return search_list
+
     def file_extension(self, files: list) -> list:
         """Checks file extension"""
-        return [x for x in files if x.split('.')[-1] in self.extension]
+        if 'all' in self.extension:
+            return files
+        else:
+            return [x for x in files if x.split('.')[-1] in self.extension]
 
-    def source_dest_handler(self, difference, mode='local') -> tuple[list, list] or list:
+    def source_dest_handler(self, files, mode='local') -> tuple[list, list] or list:
         """Handles transfer paths. Returns two list with source and destination paths.
         If mode is set to 'remote', then only destination path are returned.
         """
 
         source_path: list = []
         dest_path: list = []
+
         if self.operating_system == "Windows":
-            source_path = [os.path.join(self.remote_path, d) for d in difference]  # From path
-            dest_path = [os.path.join(self.local_path, d) for d in difference]  # To path
+            source_path = [os.path.join(self.remote_path, d) for d in files]  # From path
+            dest_path = [os.path.join(self.local_path, d) for d in files]  # To path
             # copy_mode = "robocopy" # Possible future upgrade
         elif self.operating_system == "Linux":
-            source_path = [os.path.join(self.remote_path, d).replace("\\", "/") for d in difference]  # From path
-            dest_path = [os.path.join(self.local_path, d).replace("\\", "/") for d in difference]  # To path
+            source_path = [os.path.join(self.remote_path, d).replace("\\", "/") for d in files]  # From path
+            dest_path = [os.path.join(self.local_path, d).replace("\\", "/") for d in files]  # To path
             # copy_mode = ""
 
         if mode == 'local':
@@ -203,7 +197,7 @@ class KopyMusic:
         If no username is present, a local to local copy direction is used instead.
         """
 
-        username, host = self.determine_os()
+        # username, host = self.determine_os()
 
         if not self.username:  # Local to local transfer
             # print(self.username) # Debug
@@ -216,44 +210,46 @@ class KopyMusic:
                 self.remote_files: list = self.file_extension(self.remote_files)
                 self.local_files: list = self.file_extension(self.local_files)
 
+            if self.search:
+                self.remote_files: list = self.search_files(self.remote_files)
+                self.local_files: list = self.search_files(self.local_files)
+
             if not self.reverse:
                 self.path = self.remote_path
-                difference = set(self.remote_files).difference(set(self.local_files))  # Checks difference
-                self.echo_transport_direction(self.local_path, self.remote_path)
+                files = set(self.remote_files).difference(set(self.local_files))  # Checks difference
             else:
                 self.path = self.local_path
-                difference = set(self.local_files).difference(set(self.remote_files))  # Checks difference
-                self.echo_transport_direction(self.local_path, self.remote_path, self.reverse)
+                files = set(self.local_files).difference(set(self.remote_files))  # Checks difference
 
-            if difference:
-
-                source_path, dest_path = self.source_dest_handler(difference)
+            if files:
+                files = sorted(files)
+                table = Table()
+                table.title = self.path
+                table.add_column('[yellow]No.', justify='left')
+                table.add_column('[#F5F5F5]FILENAME', justify='left')
+                source_path, dest_path = self.source_dest_handler(files)
                 source_path: list = source_path
                 dest_path: list = dest_path
 
-                for source, dest, diff in zip(source_path, dest_path, difference):
+                with Live(table, refresh_per_second=10):
+                    for idx, (source, dest, file) in enumerate(zip(source_path, dest_path, files), start=1):
 
-                    if self.reverse:
-                        source, dest = dest, source
+                        if self.reverse:
+                            source, dest = dest, source
 
-                    output_format = "[FOLDER:{0}]━[TRACK:{1}]".format(
-                        self.color(self.path, 'green'),
-                        self.color(diff, 'green'))
-                    print(output_format)
+                        table.add_row(f'[#9ACD32]{idx:0>3}', f'{file}')
 
-                    # Use windows robocopy
-                    # if copy_mode:
-                    #     command = subprocess.Popen("Robocopy ", shell=True, text=True,
-                    #                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    #     output, error = command.communicate()
-                    #     list_output: list = [x for x in output.split("\n") if x]
+                        try:
+                            if self.transfer_files:
+                                table.add_row(f'[#9ACD32]{idx:0>3}', f'{file}')
+                                with open(source, 'rb') as rf:
+                                    read_file = rf.read()
 
-                    if self.transfer_files:
-                        with open(source, 'rb') as rf:
-                            file = rf.read()
-
-                        with open(dest, 'wb') as wf:
-                            wf.write(file)
+                                with open(dest, 'wb') as wf:
+                                    wf.write(read_file)
+                        except PermissionError:
+                            print("Can't copy directory")
+                            raise SystemExit(0)
             else:
                 print("\x1b[1;31m[-]\x1b[0m Nothing to copy.")
 
@@ -264,45 +260,44 @@ class KopyMusic:
             with pysftp.Connection(host=self.host, username=self.username, password=self.password,
                                    private_key=private_key, port=self.port) as sftp:
 
-                self.remote_files: list = sftp.listdir(self.path)  # Music folder on my raspberry pi
+                self.remote_files: list = sftp.listdir(self.path)
                 self.local_files: list = self.list_local_folder(self.local_path)
 
                 if self.extension:
                     self.remote_files: list = self.file_extension(self.remote_files)
                     self.local_files: list = self.file_extension(self.local_files)
 
+                if self.search:
+                    self.remote_files: list = self.search_files(self.remote_files)
+                    self.local_files: list = self.search_files(self.local_files)
+
                 if not self.reverse:
-                    username = self.username
-                    host = self.host
                     loader = sftp.get
-                    difference = set(self.remote_files).difference(set(self.local_files))  # Checks difference
-                    self.echo_transport_direction(self.local_path, self.remote_path)
+                    files = set(self.remote_files).difference(set(self.local_files))  # Checks difference
                 else:
 
                     loader = sftp.put
-                    difference = set(self.local_files).difference(set(self.remote_files))  # Checks difference
-                    self.echo_transport_direction(self.local_path, self.remote_path, self.reverse)
+                    files = set(self.local_files).difference(set(self.remote_files))  # Checks difference
 
-                if difference:
+                if files:
+                    files = sorted(files)
+                    table = Table()
+                    table.title = self.path
+                    table.add_column('[yellow]No.', justify='left')
+                    table.add_column('[#F5F5F5]FILENAME', justify='left')
+                    dest_path = self.source_dest_handler(files, mode='remote')
 
-                    dest_path: list = self.source_dest_handler(difference, mode='remote')
+                    with Live(table, refresh_per_second=10):
 
-                    for dest, diff in zip(dest_path, difference):
+                        for idx, (dest, file) in enumerate(zip(dest_path, files), start=1):
 
-                        output_format = "[{0}]━━[USER:{1}]━[HOST:{2}]━[FOLDER:{3}]━[TRACK:{4}]".format(
-                            self.color('+', 'green'),
-                            self.color(username,
-                                       'green'),
-                            self.color(host, 'green'),
-                            self.color(self.path, 'green'),
-                            self.color(diff, 'green'))
-                        print(output_format)
-
-                        if self.transfer_files:
-                            loader(remotepath=f"{self.path}/{diff}", localpath=dest)  # Does the heavy lifting
-
+                            if self.transfer_files:
+                                table.add_row(f'[#9ACD32]{idx:0>3}', f'{file}')
+                                loader(remotepath=f"{self.path}/{file}", localpath=dest)  # Does the heavy lifting
+                            else:
+                                table.add_row(f'[#9ACD32]{idx:0>3}', f'{file}')
                 else:
-                    print("\x1b[1;31m[-]\x1b[0m Nothing to copy.")
+                    print("[\x1b[1;31m-\x1b[0m] Nothing to copy.")
 
 
 def main() -> int:
