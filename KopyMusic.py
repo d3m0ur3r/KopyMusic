@@ -4,26 +4,34 @@ from km_argparser import arg_parser
 import re
 from rich.table import Table
 from rich.live import Live
+from km_utils import SSHConfig
+from km_pseudoshell import PseudoShell
 
 
 class KopyMusic:
     def __init__(self):
         super(KopyMusic, self).__init__()
 
-        self.args = arg_parser()
-
-        self.remote_path: str = self.args.remote
-        self.local_path: str = self.args.local
-        self.username: str = self.args.username
-        self.password: str = self.args.password
-        self.extension: list = self.args.ext
-        self.search: str = self.args.search
+        self.args = arg_parser()  # Argparse engage
+        # ═══════════════════════════════════════════════[ Args String ]══════════════════════════════════════════════ #
+        self.remote_path: str = self.args.remote  # String
+        self.local_path: str = self.args.local  # String
+        self.username: str = self.args.username  # String
+        self.password: str = self.args.password  # String
+        self.search: str = self.args.search  # String
+        # ═══════════════════════════════════════════════[ Args Bools ]═══════════════════════════════════════════════ #
         self.reverse: bool = self.args.reverse  # Switch
         self.mirror: bool = self.args.mirror  # Switch
         self.transfer_files: bool = self.args.transfer  # Switch
         self.clobber: bool = self.args.clobber  # Switch
         self.debug: bool = self.args.debug  # Switch
-        self.port: int = self.args.port
+        self.shell: bool = self.args.shell  # Switch
+        # ═══════════════════════════════════════════════[ Args Lists ]═══════════════════════════════════════════════ #
+        self.extension: list = self.args.ext  # List
+        # ════════════════════════════════════════════════[ Args Ints ]═══════════════════════════════════════════════ #
+        self.port: int = self.args.port  # Int
+        # ════════════════════════════════════════════════════════════════════════════════════════════════════════════ #
+
         self.host: str = "Host"
         self.path: str = "Path"
         self.operating_system: str = "OS"
@@ -31,6 +39,7 @@ class KopyMusic:
         self.remote_files: list = []
         self.local_files: list = []
 
+        # ═══════════════════════════════════════════════[ Runs Script ]═════════════════════════════════════════════ #
         if self.debug:
             self.debugger()
         else:
@@ -42,6 +51,7 @@ class KopyMusic:
                 self.filetransfer()
                 self.reverse = True
                 self.filetransfer()
+        # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════ #
 
     def determine_os(self) -> tuple:
         """Determines the OS"""
@@ -138,6 +148,34 @@ class KopyMusic:
 
     def path_handler(self):
         """Replaces slashes based on OS"""
+
+        # ════════════════════════════════════════════[ Ssh Config Handle ]══════════════════════════════════════════ #
+        try:
+            r_host, r_path = self.remote_path.split("/", maxsplit=1)
+        except ValueError:
+            r_host = self.remote_path
+            r_path = "Music"
+
+        check_ssh_config: dict.values = SSHConfig().find_user_ssh_config(
+            r_host)  # Finds .ssh/config and uses hostname and user
+
+        if check_ssh_config:
+            hostname, self.username = check_ssh_config
+            self.remote_path = f'{hostname}/{r_path}'
+        # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════ #
+
+        # ════════════════════════════════════════════[ Local Path Handle ]══════════════════════════════════════════ #
+        try:
+            l_host, l_path = self.local_path.split("/", maxsplit=1)
+        except ValueError:
+            l_host = self.local_path
+            l_path = "Music"
+        self.local_path = f'{l_host}/{l_path}'
+        # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════ #
+
+        self.local_path = self.local_path.replace('\\', '/')
+        self.remote_path = self.remote_path.replace('\\', '/')
+
         if '/' in self.remote_path:
             """Linux System parsing of folder path"""
             self.host, path = self.remote_path.split("/", maxsplit=1)
@@ -197,8 +235,6 @@ class KopyMusic:
         If no username is present, a local to local copy direction is used instead.
         """
 
-        # username, host = self.determine_os()
-
         if not self.username:  # Local to local transfer
             # print(self.username) # Debug
             self.local_to_local()  # Checks if paths are valid
@@ -224,7 +260,7 @@ class KopyMusic:
             if files:
                 files = sorted(files)
                 table = Table()
-                table.title = self.path
+                table.title = self.remote_path
                 table.add_column('[yellow]No.', justify='left')
                 table.add_column('[#F5F5F5]FILENAME', justify='left')
                 source_path, dest_path = self.source_dest_handler(files)
@@ -259,6 +295,14 @@ class KopyMusic:
             import pysftp
             with pysftp.Connection(host=self.host, username=self.username, password=self.password,
                                    private_key=private_key, port=self.port) as sftp:
+                # file_names = []
+                # dir_names = []
+                # un_name = []
+                # sftp.walktree(self.path, lambda x: file_names.append(x), lambda y: dir_names.append(y),
+                #               lambda z: un_name.append(z), recurse=True)
+                # print(len(file_names))
+                # print(len(dir_names))
+                # print(un_name)
 
                 self.remote_files: list = sftp.listdir(self.path)
                 self.local_files: list = self.list_local_folder(self.local_path)
@@ -279,10 +323,15 @@ class KopyMusic:
                     loader = sftp.put
                     files = set(self.local_files).difference(set(self.remote_files))  # Checks difference
 
+                # ═════════════════════════════════════════[ Work In Progress ]═══════════════════════════════════════ #
+                if self.shell:
+                    PseudoShell().run_shell(self.remote_path, self.remote_files)
+                # ════════════════════════════════════════════════════════════════════════════════════════════════════ #
+
                 if files:
                     files = sorted(files)
                     table = Table()
-                    table.title = self.path
+                    table.title = self.remote_path
                     table.add_column('[yellow]No.', justify='left')
                     table.add_column('[#F5F5F5]FILENAME', justify='left')
                     dest_path = self.source_dest_handler(files, mode='remote')

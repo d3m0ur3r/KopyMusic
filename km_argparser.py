@@ -73,7 +73,7 @@ def arg_parser() -> argparse.Namespace:
                         action='store_true',
                         help='Signals the program to copy the files')
 
-    parser.add_argument('--ext',
+    parser.add_argument('-E', '--ext',
                         action='store',
                         metavar='File type',
                         nargs="+",
