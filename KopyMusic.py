@@ -32,9 +32,11 @@ class KopyMusic:
         self.port: int = self.args.port  # Int
         # ════════════════════════════════════════════════════════════════════════════════════════════════════════════ #
 
-        self.host: str = "Host"
-        self.path: str = "Path"
-        self.operating_system: str = "OS"
+        self.title: str = ''
+        self.host: str = 'Host'
+        self.path: str = 'Path'
+        self.remote_operation_system: str = 'OS'
+        self.local_operating_system: str = 'OS'
 
         self.remote_files: list = []
         self.local_files: list = []
@@ -52,20 +54,6 @@ class KopyMusic:
                 self.reverse = True
                 self.filetransfer()
         # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════ #
-
-    def determine_os(self) -> tuple:
-        """Determines the OS"""
-
-        self.operating_system = platform.system()
-
-        if self.operating_system == 'Windows':
-            username = os.environ['USERNAME']
-            host = os.environ['COMPUTERNAME']
-        else:
-            username = os.environ['USER']
-            host = os.uname().nodename
-
-        return username, host
 
     def debugger(self) -> None:
         """Debugger menu"""
@@ -130,6 +118,7 @@ class KopyMusic:
 
     def remote_to_local(self) -> None:
         """Uses sftp to connect to remote path"""
+        # No use as of v0.2
         if not self.validate_path(self.local_path):
             print("Local path not valid.")
             raise SystemExit(0)
@@ -141,7 +130,7 @@ class KopyMusic:
 
     def list_local_folder(self, path: str) -> list:
         """Lists a local folder using powershell"""
-        self.operating_system = platform.system()
+        self.local_operating_system = platform.system()
 
         list_output: list = os.listdir(path)
         return list_output
@@ -149,44 +138,41 @@ class KopyMusic:
     def path_handler(self):
         """Replaces slashes based on OS"""
 
+        if self.local_operating_system == 'Windows':
+            slash = '\\'
+        else:
+            slash = '/'
+
         # ════════════════════════════════════════════[ Ssh Config Handle ]══════════════════════════════════════════ #
+
         try:
-            r_host, r_path = self.remote_path.split("/", maxsplit=1)
+            r_host, r_path = self.remote_path.split(slash, maxsplit=1)
         except ValueError:
             r_host = self.remote_path
             r_path = "Music"
 
-        check_ssh_config: dict.values = SSHConfig().find_user_ssh_config(
+        check_ssh_config: dict.values = SSHConfig(self.local_operating_system).find_user_ssh_config(
             r_host)  # Finds .ssh/config and uses hostname and user
 
         if check_ssh_config:
-            hostname, self.username = check_ssh_config
-            self.remote_path = f'{hostname}/{r_path}'
-        # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════ #
+            r_host, self.username = check_ssh_config
+            self.remote_path = os.path.join(r_host, r_path)
+
+        self.host = r_host
+        self.path = r_path
 
         # ════════════════════════════════════════════[ Local Path Handle ]══════════════════════════════════════════ #
-        try:
-            l_host, l_path = self.local_path.split("/", maxsplit=1)
-        except ValueError:
-            l_host = self.local_path
-            l_path = "Music"
-        self.local_path = f'{l_host}/{l_path}'
+
+        if self.local_path[2:] == os.environ.get('HOMEPATH'):
+
+            try:
+                l_host, l_path = self.local_path.split(slash, maxsplit=1)
+            except ValueError:
+                l_host = self.local_path
+                l_path = "Music"
+            self.local_path = os.path.join(l_host, l_path)
+
         # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════ #
-
-        self.local_path = self.local_path.replace('\\', '/')
-        self.remote_path = self.remote_path.replace('\\', '/')
-
-        if '/' in self.remote_path:
-            """Linux System parsing of folder path"""
-            self.host, path = self.remote_path.split("/", maxsplit=1)
-            self.path = f"./{path}"
-            # self.operating_system = "Linux"
-
-        elif '\\' in self.remote_path:
-            """Windows System parsing of folder path"""
-            self.host, path = self.remote_path.split("\\", maxsplit=1)
-            self.path = fr".\{path}"
-            # self.operating_system = "Windows"
 
     def search_files(self, files: list) -> list:
         """Searches for input given and returns a list"""
@@ -201,7 +187,7 @@ class KopyMusic:
 
     def file_extension(self, files: list) -> list:
         """Checks file extension"""
-        if 'all' in self.extension:
+        if '*' in self.extension:
             return files
         else:
             return [x for x in files if x.split('.')[-1] in self.extension]
@@ -214,11 +200,11 @@ class KopyMusic:
         source_path: list = []
         dest_path: list = []
 
-        if self.operating_system == "Windows":
+        if self.local_operating_system == "Windows":
             source_path = [os.path.join(self.remote_path, d) for d in files]  # From path
             dest_path = [os.path.join(self.local_path, d) for d in files]  # To path
             # copy_mode = "robocopy" # Possible future upgrade
-        elif self.operating_system == "Linux":
+        elif self.local_operating_system == "Linux":
             source_path = [os.path.join(self.remote_path, d).replace("\\", "/") for d in files]  # From path
             dest_path = [os.path.join(self.local_path, d).replace("\\", "/") for d in files]  # To path
             # copy_mode = ""
@@ -234,6 +220,13 @@ class KopyMusic:
         The difference between those folders are copied to the local folder
         If no username is present, a local to local copy direction is used instead.
         """
+
+        # print(self.local_path)
+        # print(self.remote_path)
+        if not self.reverse:
+            self.title = self.remote_path.replace('\\', ' | ').replace('/', ' | ')
+        else:
+            self.title = self.local_path.replace('\\', ' | ').replace('/', ' | ')
 
         if not self.username:  # Local to local transfer
             # print(self.username) # Debug
@@ -260,7 +253,7 @@ class KopyMusic:
             if files:
                 files = sorted(files)
                 table = Table()
-                table.title = self.remote_path
+                table.title = self.title
                 table.add_column('[yellow]No.', justify='left')
                 table.add_column('[#F5F5F5]FILENAME', justify='left')
                 source_path, dest_path = self.source_dest_handler(files)
@@ -304,6 +297,13 @@ class KopyMusic:
                 # print(len(dir_names))
                 # print(un_name)
 
+                if 'home' in sftp.pwd:
+                    self.remote_operation_system = 'Linux'
+                    self.remote_path.replace('\\', '/')
+                else:
+                    self.remote_operation_system = 'Windows'
+                    self.remote_path.replace('/', '\\')
+
                 self.remote_files: list = sftp.listdir(self.path)
                 self.local_files: list = self.list_local_folder(self.local_path)
 
@@ -331,7 +331,7 @@ class KopyMusic:
                 if files:
                     files = sorted(files)
                     table = Table()
-                    table.title = self.remote_path
+                    table.title = self.title
                     table.add_column('[yellow]No.', justify='left')
                     table.add_column('[#F5F5F5]FILENAME', justify='left')
                     dest_path = self.source_dest_handler(files, mode='remote')

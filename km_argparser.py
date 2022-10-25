@@ -1,5 +1,7 @@
 import sys
 import argparse
+import os
+from km_utils import KMOperatingSystem
 
 banner = r"""
  _   __                     ___  ___             _       
@@ -14,16 +16,20 @@ banner = r"""
 
 banner = f"\x1b[1;32m{banner}\x1b[0m"  # Adds color
 
+_, _, home_path = KMOperatingSystem().determine_os()
+
 
 def arg_parser() -> argparse.Namespace:
     # ArgParser - Define Usage
     prog_name = sys.argv[0]
     parser = argparse.ArgumentParser(prog=prog_name,
                                      epilog=r"""
- *   KopyMusic does 'no-clobber' by default.
- **  KopyMusic uses sftp to connect to remote path.
+ *    KopyMusic does 'no-clobber' by default.
+ **   KopyMusic uses sftp to connect to remote path.
+ ***  KopyMusic defaults to the users Music path if no path is specified.
+ **** KopyMusic tries to use '.ssh/config' if host is found in given config.
 ╔══════════════════════════════════════[ Examples ]═════════════════════════════════════╗
-║  -u jack -r 192.168.1.110/Music -l $HOME/Music -t                                     ║
+║  -u jack -p 12345678 -r 192.168.1.110 -l $HOME -t                                     ║
 ║  -u jack -r 192.168.1.110/Music -l ~/Music/ -t                                        ║
 ║  -u jack -r 192.168.1.110/Music -l ~/Music/ --reverse -t #Reverses the copy direction ║
 ╚═══════════════════════════════════════════════════════════════════════════════════════╝
@@ -43,7 +49,7 @@ def arg_parser() -> argparse.Namespace:
                         action='store',
                         metavar='Local',
                         type=str,
-                        required=True,
+                        default=os.path.join(home_path, 'Music'),
                         help=r'Local folder e.g. C:\Users\MyUser\Music.')
 
     parser.add_argument('-u', '--username',
@@ -99,7 +105,7 @@ def arg_parser() -> argparse.Namespace:
 
     parser.add_argument('-S', '--shell',
                         action='store_true',
-                        help='Creates a pseudo-shell for ease of use')
+                        help='Creates a pseudo-shell for ease of use [Needs works].')
 
     parser.add_argument('--debug',
                         action='store_true',
