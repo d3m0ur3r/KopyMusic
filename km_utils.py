@@ -8,11 +8,10 @@ class SSHConfig:
         super(SSHConfig, self).__init__()
 
         self.operating_system = operating_system
-        self.home = os.environ.get('HOMEPATH')
-        self.ssh_config_path = self.os_handle()
-        self.operating_system = 'OS'
+        self.home = KMOperatingSystem().determine_os()[-1]
+        self.ssh_config_path = self.config_path()
 
-    def os_handle(self):
+    def config_path(self):
         if self.operating_system == 'Windows':
             return f"{self.home}\\.ssh\\config"
         else:
@@ -76,7 +75,7 @@ class KMOperatingSystem:
 
 
 def main() -> int:
-    print(SSHConfig('Windows').find_user_ssh_config('pi'))
+    print(SSHConfig('Windows').find_user_ssh_config('pialps'))
     return 0
 
 
