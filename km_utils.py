@@ -75,7 +75,7 @@ class KMOperatingSystem:
 
 
 def main() -> int:
-    print(SSHConfig('Windows').find_user_ssh_config('pialps'))
+    print(SSHConfig(platform.system()).find_user_ssh_config('pialps'))
     return 0
 
 

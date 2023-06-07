@@ -1,3 +1,6 @@
+/dist
+/build
 /__pycache__/
 /km_tests.py
 /run.ps1
+/kopymusic.spec

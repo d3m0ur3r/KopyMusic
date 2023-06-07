@@ -45,6 +45,7 @@ class KopyMusic:
         if self.debug:
             self.debugger()
         else:
+            self.remote_path = self.sanitize_path(self.remote_path)
             self.path_handler()
 
             if not self.mirror:
@@ -54,6 +55,13 @@ class KopyMusic:
                 self.reverse = True
                 self.filetransfer()
         # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════ #
+
+    @staticmethod
+    def sanitize_path(path: str) -> str:
+        """Sanitizes path"""
+        if '..' in path:
+            path = path.replace('..', '.')
+        return path
 
     def debugger(self) -> None:
         """Debugger menu"""
